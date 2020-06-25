@@ -4,7 +4,9 @@ PE to shellcode will convert any Windows non .dot net 64bit EXE file to shellcod
 
 
 Options:
+
 -f specify an exe file to convert
+
 -o output binary shell file to use
 
 Usage: pe2shellcode -f 64bitexe.exe -o shellcode.sc
