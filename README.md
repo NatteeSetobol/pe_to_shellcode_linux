@@ -7,7 +7,9 @@ Hldr64 file source by hashrezade
 https://github.com/hasherezade/pe_to_shellcode/tree/master/hldr64
 
 
+
 Downloading and Building:
+
 
 In the terminal, download the source code via git:
 
@@ -20,7 +22,9 @@ cd pe_to_shellcode_linux
 type ./build.sh
 
 
+
 Options:
+
 
 -f specify an exe file to convert
 
