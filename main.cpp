@@ -276,6 +276,16 @@ ui8 * shellcodify(ui8 *my_exe, size_t exe_size, size_t &out_size, bool is64b)
 	
 }
 
+void DisplayHelp()
+{
+	printf("\n");
+	printf("-f <execute path>         - Specify the exe to convert to shell code.\n");
+	printf("-o <output name>		  - Specify output shell code.\n");
+	printf("-x <string to xor>        - String to XOR the shellcode to evade.\n");
+	printf("-l <length of xor string> - Specify length of the string XOR.\n");
+	printf("-h Display this\n");
+}
+
 int main(int argc, char *args[])
 {
 	bool32 isArgValid = true;
@@ -293,7 +303,10 @@ int main(int argc, char *args[])
 	FILE *outFile = NULL;
 	s32 *filename = NULL;
 	s32 *outputFilename = NULL;
+	s32 *xorKey = NULL;
+	int xorLen = 0;
 
+	printf("------ Win32 EXE to Shellcode -----\n");
 	for (int argIndex = 0; argIndex < argc; argIndex++)
 	{
 		if (StrCmp(args[argIndex], "-f"))
@@ -310,6 +323,21 @@ int main(int argc, char *args[])
 			{
 				outputFilename = S32(args[argIndex+1]);
 			}
+		}
+		if (StrCmp(args[argIndex], "-x"))
+		{
+			if (argIndex+1 < argc)
+			{
+				xorKey = S32(args[argIndex+1]);
+			}
+		}
+		if (StrCmp(args[argIndex], "-l"))
+		{
+			if (argIndex+1 < argc)
+			{
+				xorLen = SToI(args[argIndex+1]);
+			}
+
 		}
 	}
 
@@ -365,8 +393,6 @@ int main(int argc, char *args[])
 					isPEValid = false;
 				}
 
-				
-
 				data_directory dd =  peOpHeader64->DataDirectory[DIRECTORY_ENTRY_COM_DESCRIPTOR];
 				if (dd.VirtualAddress != 0)
 				{
@@ -394,29 +420,62 @@ int main(int argc, char *args[])
 		{
 			printf("Creating Shell Code.\n");
 			payload = shellcodify(appBytes, fileSize, outSize,PEIs64Bit(appBytes));
-
-			outFile = fopen(outputFilename,"wb");
-
-			if (outFile)
-			{
-				printf("Writing  to file...%s\n",outputFilename);
-				fwrite(payload,1,outSize,outFile);
-				printf("Done...\n");
-			} else {
-
-				printf("Can't not create file.");
-			}
-
-			fclose(outFile);
-
 			if (payload)
 			{
-				Free(payload);
-				payload = NULL;
+				int xorCount = 0;
+
+				if (xorKey)
+				{
+					if (xorLen <= 0)
+					{
+						xorLen = Strlen(xorKey);
+					}
+
+					for (int xorKeyIndex = 0; xorKeyIndex <  outSize; xorKeyIndex++)
+					{
+						payload[xorKeyIndex] ^=  xorKey[xorCount];
+
+						if (xorCount > xorLen-1)
+						{
+							xorCount = 0;
+						} else {
+							xorCount++;
+						}
+					}
+				}
+
+				outFile = fopen(outputFilename,"wb");
+
+				if (outFile)
+				{
+					printf("Writing  to file...%s\n",outputFilename);
+					fwrite(payload,1,outSize,outFile);
+					printf("Done...\n");
+				} else {
+
+					printf("Can't not create file.");
+				}
+
+				fclose(outFile);
+
+				if (payload)
+				{
+					Free(payload);
+					payload = NULL;
+				}
 			}
+		} else {
+			DisplayHelp();
 		}
+	} else {
+		DisplayHelp();
 	}
 
+	if (xorKey)
+	{
+		Free(xorKey);
+		xorKey=NULL;
+	}
 	if (outputFilename)
 	{
 		Free(outputFilename);
