@@ -339,6 +339,10 @@ int main(int argc, char *args[])
 			}
 
 		}
+		if (StrCmp(args[argIndex], "-h"))
+		{
+			isArgValid = false;
+		}
 	}
 
 	if (outputFilename == NULL)
