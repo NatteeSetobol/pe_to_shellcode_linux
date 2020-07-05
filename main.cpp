@@ -231,7 +231,12 @@ ui8 * shellcodify(ui8 *my_exe, size_t exe_size, size_t &out_size, bool is64b)
 	ui8 *ext_buf = NULL;
 	s32* stubsFile = NULL;
 
-	stubsFile = S32("stub64.bin");
+	if (is64b)
+	{
+		stubsFile = S32("stub64.bin");
+	} else {
+		stubsFile = S32("stub32.bin");
+	}
 
 	fileStub = fopen(stubsFile, "rb");
 
@@ -257,9 +262,12 @@ ui8 * shellcodify(ui8 *my_exe, size_t exe_size, size_t &out_size, bool is64b)
 		overwrite_hdr(ext_buf, ext_size, raw_addr);
 
 		out_size = ext_size;
+
+		fclose(fileStub);
+	} else {
+		printf("Can not open stub file\n");
 	}
 
-	fclose(fileStub);
 
 	if (stub)
 	{
@@ -299,12 +307,14 @@ int main(int argc, char *args[])
 	struct PE_HEADER *peHeader = NULL;
 	struct PE_OP_HEADER *peOpHeader=NULL;
 	struct PE_OP_HEADER64 *peOpHeader64=NULL;
+	struct PE_OP_HEADER32 *peOpHeader32=NULL;
 	ui8 *payload = NULL;
 	FILE *outFile = NULL;
 	s32 *filename = NULL;
 	s32 *outputFilename = NULL;
 	s32 *xorKey = NULL;
 	int xorLen = 0;
+	bool Is64Bits = false;
 
 	printf("------ Win32 EXE to Shellcode -----\n");
 	for (int argIndex = 0; argIndex < argc; argIndex++)
@@ -369,7 +379,6 @@ int main(int argc, char *args[])
 			dosHeader = (MS_DOS_HEADER*) appBytes;
 			peHeader = (PE_HEADER *) ( (  appBytes) +  dosHeader->PEOffset);
 			peOpHeader = (PE_OP_HEADER *) ( (  appBytes) +  dosHeader->PEOffset+sizeof(PE_HEADER));
-			peOpHeader64 = (PE_OP_HEADER64 *) ( (  appBytes) +  dosHeader->PEOffset+sizeof(PE_HEADER));
 
 			printf("Header magic %x\n", dosHeader->magic);
 			printf("Filename: %s\n", filename);
@@ -378,39 +387,61 @@ int main(int argc, char *args[])
 			{
 
 				printf("Appication Type: ");
-				if (PEIs64Bit(appBytes))
+
+				Is64Bits = PEIs64Bit(appBytes);
+
+				//NOTES(): This is prob not the best way to do this, but since I'm not using templates, I have no choice unless I can figure out a another good way to do this.
+				if (Is64Bits)
 				{
+					peOpHeader64 = (PE_OP_HEADER64 *) ( (  appBytes) +  dosHeader->PEOffset+sizeof(PE_HEADER));
 					printf("64 Bits ");
+					if (peOpHeader64->subSystem ==  SUBSYSTEM_WINDOWS_GUI)
+					{
+						printf("Windows GUI Appication.\n");
+					} else
+						if (peOpHeader64->subSystem ==  SUBSYSTEM_WINDOWS_CUI)
+						{
+							printf("Console Application.\n");
+						} else {
+							printf("Application is not supportive.\n");
+							isPEValid = false;
+						}
+
+					data_directory dd =  peOpHeader64->DataDirectory[DIRECTORY_ENTRY_COM_DESCRIPTOR];
+					if (dd.VirtualAddress != 0)
+					{
+						printf("Dot net appicaltion are not supportive.\n");
+						isPEValid = false;
+					}
+
+					data_directory tlsdd =  peOpHeader64->DataDirectory[DIRECTORY_ENTRY_TLS];
+
+					if (tlsdd.VirtualAddress != 0)
+					{
+						printf("TLS Callbacks are not supportive!\n");
+						isPEValid = false;
+					}
+
 				} else {
-					printf("32 Bits *not yet supportive.");
-					isPEValid = false;
-				}
-				if (peOpHeader64->subSystem ==  SUBSYSTEM_WINDOWS_GUI)
-				{
-					printf("Windows GUI Appication.\n");
-				} else
-				if (peOpHeader64->subSystem ==  SUBSYSTEM_WINDOWS_CUI)
-				{
-					printf("Console Application.\n");
-				} else {
-					printf("Application is not supportive.\n");
-					isPEValid = false;
+					peOpHeader32 = (PE_OP_HEADER32 *) ( (  appBytes) +  dosHeader->PEOffset+sizeof(PE_HEADER));
+					printf("32 Bits ");
+
+					data_directory dd =  peOpHeader32->DataDirectory[DIRECTORY_ENTRY_COM_DESCRIPTOR];
+					if (dd.VirtualAddress != 0)
+					{
+						printf("Dot net appicaltion are not supportive.\n");
+						isPEValid = false;
+					}
+
+					data_directory tlsdd =  peOpHeader32->DataDirectory[DIRECTORY_ENTRY_TLS];
+
+					if (tlsdd.VirtualAddress != 0)
+					{
+						printf("TLS Callbacks are not supportive!\n");
+						isPEValid = false;
+					}
 				}
 
-				data_directory dd =  peOpHeader64->DataDirectory[DIRECTORY_ENTRY_COM_DESCRIPTOR];
-				if (dd.VirtualAddress != 0)
-				{
-					printf("Dot net appicaltion are not supportive.\n");
-					isPEValid = false;
-				}
-
-				data_directory tlsdd =  peOpHeader64->DataDirectory[DIRECTORY_ENTRY_TLS];
-
-				if (tlsdd.VirtualAddress != 0)
-				{
-					printf("TLS Callbacks are not supportive!\n");
-					isPEValid = false;
-				}
 			} else {
 				printf("Invalid Header!\n");
 				isPEValid = false;
@@ -423,7 +454,7 @@ int main(int argc, char *args[])
 		if (isPEValid)
 		{
 			printf("Creating Shell Code.\n");
-			payload = shellcodify(appBytes, fileSize, outSize,PEIs64Bit(appBytes));
+			payload = shellcodify(appBytes, fileSize, outSize,Is64Bits);
 			if (payload)
 			{
 				int xorCount = 0;
@@ -455,12 +486,13 @@ int main(int argc, char *args[])
 					printf("Writing  to file...%s\n",outputFilename);
 					fwrite(payload,1,outSize,outFile);
 					printf("Done...\n");
+
+					fclose(outFile);
 				} else {
 
 					printf("Can't not create file.");
 				}
 
-				fclose(outFile);
 
 				if (payload)
 				{
