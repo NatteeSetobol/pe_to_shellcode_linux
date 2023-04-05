@@ -1,6 +1,7 @@
 # pe_to_shellcode_linux
 
-PE to shellcode will convert any Windows non .dot net 64bit EXE file to shellcode. This is based on hasherezade's pe_to_shellcode for Windows (https://github.com/hasherezade/pe_to_shellcode). 
+The PE to shellcode converter is a powerful tool for penetration testing and vulnerability analysis that allows you to convert any non .NET 64-bit Windows executable file to shellcode. The resulting shellcode can also be used to build custom payloads for use in security testing and penetration testing scenarios. The conversion process works by taking an executable file and converting it to a stream of shellcode that can be injected into memory at runtime.
+
 
 Hldr64 file source by hashrezade
 
